@@ -1,12 +1,8 @@
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <netinet/in.h>
-#include <unistd.h>
 #include <arpa/inet.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdbool.h>
+#include <unistd.h>
+#include <stdio.h> // for debugging
 
 #include "dns_struct.h"
 #include "find_upserver.h"
@@ -25,8 +21,9 @@
 #define PORT 53
 #define BUF_LENGTH 128
 
-int main(int argc, char*argv[])
+int main(int argc, char *argv[])
 {   
+    
     int ListenSocket = socket(AF_INET, SOCK_DGRAM, 0);
     if(ListenSocket == -1)
     {
@@ -41,7 +38,7 @@ int main(int argc, char*argv[])
     
     if(bind(ListenSocket, (struct sockaddr *)&LSockAddr, sizeof(LSockAddr)) == -1)
     {
-        perror("Error: bind listen socket\n");
+        perror("Error: bind listen socket");
         exit(1);
     } 
     
@@ -58,43 +55,47 @@ int main(int argc, char*argv[])
     socklen_t r_len = sizeof(RSockAddr);
 
     struct dns_header DnsRequest;
-    struct dns_questions DnsRequestQuestions;
+    struct dns_questions DnsRequestQuestions; 
       
-    while(true)
+    while(1)
     {    
        uint8_t buf[BUF_LENGTH];
-       if(recvfrom(ListenSocket, buf, BUF_LENGTH, 0, (struct sockaddr *)&CSockAddr, &c_len) == -1)
+       if((recvfrom(ListenSocket, buf, BUF_LENGTH, 0, (struct sockaddr *)&CSockAddr, &c_len)) == -1)
        {
            perror("Error: recvfrom client\n");            
        }
-                    
+       
        FillInHeader(&DnsRequest, buf);       
        FillInQuestions(&DnsRequestQuestions, buf);
 
        if (DnsRequestQuestions.QTYPE == A)
        {
-         if(!FindInBlackList(DnsRequestQuestions.QNAME))
-         { 
-            int RedirectSocket = socket(AF_INET, SOCK_DGRAM, 0);
-
-            if(sendto(RedirectSocket, buf, BUF_LENGTH, 0, (struct sockaddr *)&RSockAddr, r_len) == -1)
-            {
-               perror("Error: redirect sendto\n");            
-            }        
-            if(recvfrom(RedirectSocket, buf, BUF_LENGTH, 0, (struct sockaddr *)&RSockAddr, &r_len) == -1)
-            {
-               perror("Error: redirect recvfrom\n");            
-            }            
-            close(RedirectSocket);
-            if(sendto(ListenSocket, buf, BUF_LENGTH, 0, (struct sockaddr *)&CSockAddr, c_len) == -1)
-            {
+           if(FindInBlackList(DnsRequestQuestions.QNAME))
+           {             
+              buf[2] = 0b10000000;           
+              buf[3] = 0b00100000 | 0b00000101;
+              if(sendto(ListenSocket, buf, BUF_LENGTH, 0, (struct sockaddr *)&CSockAddr, c_len) == -1)
+              {
+                  perror("Error: sendto client\n");
+              }
+           }
+           else
+           {
+              int RedirectSocket = socket(AF_INET, SOCK_DGRAM, 0);
+              if(sendto(RedirectSocket, buf, BUF_LENGTH, 0, (struct sockaddr *)&RSockAddr, r_len) == -1)
+              {
+                 perror("Error: redirect sendto\n");            
+              }        
+              if((recvfrom(RedirectSocket, buf, BUF_LENGTH, 0, (struct sockaddr *)&RSockAddr, &r_len)) == -1)
+              {
+                 perror("Error: redirect recvfrom\n");            
+              }            
+              close(RedirectSocket);
+              if(sendto(ListenSocket, buf, BUF_LENGTH, 0, (struct sockaddr *)&CSockAddr, c_len) == -1)
+              {
                 perror("Error: sendto client\n");
-            }
-          }
-          if(sendto(ListenSocket, buf, BUF_LENGTH, 0, (struct sockaddr *)&CSockAddr, c_len) == -1)
-          {
-            perror("Error: sendto client\n");
-          }
+              }                
+           }
         }
         else
         {       

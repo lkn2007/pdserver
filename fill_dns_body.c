@@ -4,13 +4,13 @@ void FillInHeader(struct dns_header *dns_h, const uint8_t *buf)
 {    
     dns_h->ID = buf[0] << 8 | buf[1];     
     
-    dns_h->Flags.QR = (buf[2] & 128) >> 7;    
-    dns_h->Flags.OPCODE = (buf[2] & 64) >> 3 | (buf[2] & 32) >> 3 | (buf[2] & 32) >> 3 | (buf[2] & 16) >> 3;    
+    dns_h->Flags.QR = (buf[2] & 128) >> 7;        
+    dns_h->Flags.OPCODE = ((buf[2] & 64) | (buf[2] & 32)  | (buf[2] & 32) | (buf[2] & 16)) >> 3;    
     dns_h->Flags.AA = (buf[2] & 4) >> 2;    
     dns_h->Flags.TC = (buf[2] & 2) >> 1;    
     dns_h->Flags.RD = (buf[2] & 1);     
     dns_h->Flags.RA = (buf[3] & 128) >> 7;   
-    dns_h->Flags.Z = (buf[3] & 64) >> 4 | (buf[3] & 32) >> 4 | (buf[3] & 16) >> 4;   
+    dns_h->Flags.Z = ((buf[3] & 64) | (buf[3] & 32) | (buf[3] & 16)) >> 4;   
     dns_h->Flags.RCODE = (buf[2] & 8) | (buf[2] & 4) | (buf[2] & 2) | (buf[2] & 1);
     
     dns_h->QDCount = buf[4] << 8 | buf[5];
